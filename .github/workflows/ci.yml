@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  typst:
+    name: 讲义编译与 PDF 同步
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 后面要比较「源码和 PDF 谁最后被改过」，需要完整历史
+          fetch-depth: 0
+
+      - name: 安装 Typst
+        uses: typst-community/setup-typst@v3
+        with:
+          typst-version: ^0.14
+
+      - name: 安装中文字体
+        run: |
+          # 正文是中文，字体列表里写的是 Microsoft YaHei——Linux runner 上没有。
+          # 装上 Noto CJK，typst 的字体回退才有东西可退，否则中文全是豆腐块。
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+
+      - name: 编译实验讲义
+        run: typst compile lecture.typ /tmp/lecture.pdf
+
+      - name: 编译教材（若已提交）
+        run: |
+          if [ -f textbook/textbook.typ ]; then
+            typst compile textbook/textbook.typ /tmp/textbook.pdf
+          else
+            echo "textbook/ 尚未提交，跳过"
+          fi
+
+      - name: PDF 是否跟着源码更新
+        run: |
+          # 这个仓库里 PDF 是生成物，但它也提交进仓库供直接下载。
+          # 最容易出的错：改完 .typ 忘了重新导出，于是读者拿到的是旧版。
+          # 用 git 的提交时间判断：源码比 PDF 新 → 大概率漏了导出。
+          fail=0
+          check() {
+            src="$1"; pdf="$2"
+            if [ ! -f "$pdf" ]; then
+              echo "skip  $pdf 不在仓库里"
+              return 0
+            fi
+            t_src=$(git log -1 --format=%ct -- "$src" 2>/dev/null || echo 0)
+            t_pdf=$(git log -1 --format=%ct -- "$pdf" 2>/dev/null || echo 0)
+            if [ "$t_src" -gt "$t_pdf" ]; then
+              echo "::error file=$src::$src 的提交时间晚于 $pdf，可能忘了重新导出"
+              fail=1
+            else
+              echo "ok    $pdf 不旧于 $src"
+            fi
+          }
+          check lecture.typ "控制理论实验讲义.pdf"
+          check textbook/textbook.typ "控制理论教材.pdf"
+          exit $fail
