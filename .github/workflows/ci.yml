@@ -63,3 +63,21 @@ jobs:
           check lecture.typ "控制理论实验讲义.pdf"
           check textbook/textbook.typ "控制理论教材.pdf"
           exit $fail
+
+  anchors:
+    name: 数值锚点验算（tools/verify_anchors.py）
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python 与 numpy
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 numpy
+        run: pip install numpy
+
+      - name: 跑全书数值锚点（89 项，FAIL 即门禁）
+        run: python tools/verify_anchors.py
