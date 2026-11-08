@@ -308,6 +308,70 @@ lamq = exp(-0.5)
 check("ch13hw1 G(z)/Kc", [1-lamq, lamq, (1+lamq)/(1-lamq), lamq-(1-lamq)], [0.393, 0.607, 4.08, 0.214], [0.001, 0.001, 0.01, 0.001])
 lam31 = exp(-0.31)
 check("ch13hw4 Kc(0.31)", [(1+lam31)/(1-lam31)], [6.50], 0.01)
+
+print("== 第 14 章:最优控制与 LQR ==")
+# Hamiltonian 特征向量法数值解代数 Riccati(与书中手解闭式对拍)
+def are_solve(A, B, Q, R):
+    n = A.shape[0]
+    H = np.block([[A, -B@np.linalg.inv(R)@B.T], [-Q, -A.T]])
+    w, v = np.linalg.eig(H)
+    idx = np.argsort(w.real)[:n]
+    V = v[:, idx]
+    P = np.real(V[n:, :] @ np.linalg.inv(V[:n, :]))
+    return (P + P.T) / 2
+A14 = np.array([[0.,1.],[0.,0.]]); B14 = np.array([[0.],[1.]])
+P14 = are_solve(A14, B14, np.eye(2), np.eye(1))
+K14 = (B14.T @ P14).flatten()
+check("ch14ex1 P 闭式", [P14[0,0], P14[0,1], P14[1,1]], [sqrt(3), 1, sqrt(3)], 1e-9)
+check("ch14ex1 K", list(K14), [1, sqrt(3)], 1e-9)
+r14 = np.roots([1, sqrt(3), 1])
+check("ch14ex1 闭环极点实部", sorted(r14.real), [-0.8660254, -0.8660254], 1e-6)
+check("ch14ex1 闭环极点虚部", sorted(abs(r14.imag)), [0.5, 0.5], 1e-6)
+z14 = sqrt(3)/2
+check("ch14ex1 zeta/Mp%", [z14, exp(-pi*z14/sqrt(1-z14*z14))*100], [0.866, 0.43], [0.001, 0.01])
+check("ch14ex1 J_min(x0=e1)", [P14[0,0]], [1.732], 0.001)
+# 权重表(四组):闭式 K + 数值穿越/裕度;w^4 - k2^2 w^2 - k1^2 = 0
+for (q1, q2, rr, want_wgc, want_pm) in [(1,1,1,1.817,72.4),(1,0,1,1.554,65.5),(1,1,0.1,4.113,79.2),(1,1,10,0.922,68.2)]:
+    k1c = sqrt(q1/rr); k2c = sqrt(q2/rr + 2*sqrt(q1/rr))
+    w2 = (k2c*k2c + sqrt(k2c**4 + 4*k1c*k1c))/2
+    wgc = sqrt(w2)
+    pm = degrees(atan(k2c*wgc/k1c))
+    check(f"ch14 权重{q1,q2,rr} wgc/PM", [wgc, pm], [want_wgc, want_pm], [0.002, 0.1])
+# 回差恒等式抽查(ω=1,Q=I,R=1):|1+L|^2 = 1+(q2 ω²+q1)/(r ω^4)
+L1 = (1.0 + 1j*sqrt(3.0))/(-1.0)  # L(j1) = (k1 + j k2 ω)/（jω)²
+check("ch14 回差 |1+L|^2(ω=1)", [abs(1+L1)**2], [1+(1+1)/1.0], 1e-9)
+# ch14ex2 弹簧质量:√5 闭式 vs Hamiltonian
+A14s = np.array([[0.,1.],[-2.,-3.]]); B14s = np.array([[0.],[1.]])
+P14s = are_solve(A14s, B14s, np.eye(2), np.eye(1))
+K14s = (B14s.T @ P14s).flatten()
+check("ch14ex2 P 闭式", [P14s[0,0], P14s[0,1], P14s[1,1]], [sqrt(5)-1, sqrt(5)-2, sqrt(5)-2], 1e-9)
+check("ch14ex2 K", list(K14s), [sqrt(5)-2, sqrt(5)-2], 1e-9)
+res14 = A14s.T@P14s + P14s@A14s - P14s@B14s@B14s.T@P14s + np.eye(2)
+check_text("ch14ex2 ARE 残差≈0", np.abs(res14).max() < 1e-10)
+r14s = np.roots([1, 1+sqrt(5), sqrt(5)])
+check("ch14ex2 闭环极点", sorted(r14s.real), [-sqrt(5), -1.0], 1e-9)
+# ch14 极小值原理 bang-bang:u=-1 一秒切 +1,T*=2 恰回原点(分段积分)
+x1b, x2b, dtb = 1.0, 0.0, 1e-5
+for i in range(200000):
+    t = i*dtb
+    u = -1.0 if t < 1.0 else 1.0
+    x2b += u*dtb
+    x1b += x2b*dtb
+check("ch14 bang-bang T*=2 末态", [x1b, x2b], [0, 0], 1e-3)
+# ch14hw1 R=4
+P14h = are_solve(A14, B14, np.eye(2), np.array([[4.]]))
+K14h = (np.linalg.inv(np.array([[4.]])) @ B14.T @ P14h).flatten()
+check("ch14hw1 K", list(K14h), [0.5, 1.1180], 1e-4)
+r14h = np.roots([1, K14h[1], K14h[0]])
+check("ch14hw1 极点实部", [sorted(r14h.real)[0]], [-0.5590], 1e-3)
+check("ch14hw1 zeta", [K14h[1]/(2*sqrt(K14h[0]))], [0.791], 1e-3)
+# ch14hw2 标量:p²+2p-1=0 → p=√2-1,闭环极点 -√2
+p14 = np.roots([1, 2, -1])
+check("ch14hw2 p=sqrt2-1", [sorted(p14.real)[-1]], [sqrt(2)-1], 1e-9)
+check("ch14hw2 闭环极点", [-1-(sqrt(2)-1)], [-sqrt(2)], 1e-9)
+# ch14hw4 Ackermann 配置到 LQR 极点,K 应与例 14.1 相同
+K14ack = ackermann(A14, B14, [-0.8660254+0.5j, -0.8660254-0.5j])
+check("ch14hw4 Ackermann K", list(np.real(K14ack)), [1, sqrt(3)], 1e-6)
 print(f"\n===== 汇总:PASS {ok} / FAIL {bad} =====")
 
 import sys

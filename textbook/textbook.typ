@@ -1,5 +1,5 @@
 // 《控制理论:从推导到实验》—— 教材版主文件
-// 原理:经典控制(第 1—8 章,配套 control-lab)+ 现代控制(第 9—12 章,配套 modern-control-lab)+ 数字实现(第 13 章,实验 10 回到 control-lab)
+// 原理:经典控制(第 1—8 章,配套 control-lab)+ 现代控制(第 9—12 章,配套 modern-control-lab)+ 数字实现(第 13 章,实验 10 回到 control-lab)+ 最优控制(第 14 章,实验 11)
 // 每章统一骨架:理论与推导 → 例题 → 实验(衔接实验台) → 思考题与习题 → 习题详解
 // 构建产生 PDF。样式在 style.typ,绘图在 figlib.typ(纯 Typst 原生,零外部依赖)。
 #import "style.typ": *
@@ -50,5 +50,9 @@
 #part[第三部分　数字实现]
 
 #include "chapters/13-discrete.typ"
+
+#part[第四部分　最优控制]
+
+#include "chapters/14-lqr.typ"
 
 #include "chapters/99-appendix.typ"
